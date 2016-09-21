@@ -2,6 +2,7 @@
 #include "cslowlog.h"
 #include <functional>
 #include <iostream>
+#include <iomanip>
 #include <cerrno>
 
 #ifdef _POSIX_MONOTONIC_CLOCK
@@ -40,6 +41,7 @@ namespace cslowlog {
          * @param return code of previously called function
          */
         int checkClkError(int retcode);
+
     public:
         /**
          * Create and start slowlog timer
@@ -70,9 +72,18 @@ namespace cslowlog {
         /**
          * Return std::ostream instance specified via template parameter if timer has been expired,
          * otherwise return dummy std::ostream& that outputs nothing
+         * Use it to log something to any ostream if timer expired
          */
         template<std::ostream&>
-        std::ostream& getOStream();
+        std::ostream& out();
+        
+        /**
+         * The same as out, but logs message about time elapsed to ostream before returning it
+         * Use it to log something to any ostream if timer expired
+         * @return chosen ostream (either from template parameter or "dummy")
+         */
+        template<std::ostream&>
+        std::ostream& outLog();
     };
 
     std::ostream Timer::dummy{nullptr};
@@ -108,9 +119,21 @@ namespace cslowlog {
     }
     
     template<std::ostream& s>
-    std::ostream& Timer::getOStream() {
+    std::ostream& Timer::out() {
         if (expired()) {
             return s;
+        }
+        return dummy;
+    }
+
+    template<std::ostream& s>
+    std::ostream& Timer::outLog() {
+        struct timespec elapsed;
+        checkClkError(cslowlog_get_elapsed(&timer, &elapsed));
+        if (cslowlog_tscmp(&elapsed, &timer.threshold) > 0) {
+            s << "CSlowlog: " << elapsed.tv_sec << ".";
+            s << std::setfill('0') << std::right << std::setw(9) << elapsed.tv_nsec;
+            return s << " elapsed; ";
         }
         return dummy;
     }
