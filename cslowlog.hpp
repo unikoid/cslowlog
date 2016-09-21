@@ -2,6 +2,7 @@
 #include "cslowlog.h"
 #include <functional>
 #include <iostream>
+#include <cerrno>
 
 #ifdef _POSIX_MONOTONIC_CLOCK
 #define __CSLOWLOG_DEFAULT_CLK CLOCK_MONOTONIC
@@ -10,23 +11,66 @@
 #endif
 
 namespace cslowlog {
+    /**
+     * Error class for clock-related errors
+     */ 
     class ClockError : public std::runtime_error {
     public:
-        int code;
-        ClockError(int code) : std::runtime_error("CSlowlog clock error"), code(code) {};
+        /**
+         * Last failed function return value
+         */
+        int retcode;
+        /**
+         * Last error number (errno)
+         */
+        int err;
+        ClockError(int retcode) : std::runtime_error("CSlowlog clock error"), retcode(retcode), err(errno) {};
     };
     
+    /**
+     * Slowlog timer.
+     */
     class Timer {
     protected:
-        static std::ostream dummy;
+        static std::ostream dummy; //// dummy "ostream" to be used instead of real one
         struct cslowlog_t timer;
+        
+        /**
+         * Check if previously called function has returned error and throw ClockError in this case. 
+         * @param return code of previously called function
+         */
         int checkClkError(int retcode);
     public:
+        /**
+         * Create and start slowlog timer
+         * @param number of seconds before timer expiration
+         * @param number of nanoseconds before timer expiration
+         * @param optional clock id (defaults to CLOCK_MONOTONIC if available, else CLOCK_REALTIME)
+         */
         Timer(time_t sec, long nsec, clockid_t clk_id);
+        
+        /**
+         * Check timer expiration
+         */
         bool expired();
+        
+        /**
+         * Get how much time has elapsed since timer start
+         */
         struct timespec get_elapsed();
-        template<typename T>
-        T run(std::function <T (struct timespec*)>);
+        
+        /**
+         * Run specified std::function if timer has expired
+         * The only function argument is pointer to the time elapsed since timer start
+         * This pointer is temporary and MUST not be used anywhere outside the function
+         */
+        template <typename T>
+        void run(std::function <T (struct timespec*)>);
+        
+        /**
+         * Return std::ostream instance specified via template parameter if timer has been expired,
+         * otherwise return dummy std::ostream& that outputs nothing
+         */
         template<std::ostream&>
         std::ostream& getOStream();
     };
@@ -54,11 +98,13 @@ namespace cslowlog {
         return elapsed;
     }
     
-    template<typename T>
-    T Timer::run(std::function <T (struct timespec*)> f) {
+    template <typename T>
+    void Timer::run(std::function <T (struct timespec*)> f) {
         struct timespec elapsed;
         checkClkError(cslowlog_get_elapsed(&timer, &elapsed));
-        return f(&elapsed);
+        if (cslowlog_tscmp(&elapsed, &timer.threshold) > 0) {
+            f(&elapsed);
+        }
     }
     
     template<std::ostream& s>

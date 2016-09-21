@@ -38,8 +38,8 @@ void cslowlog_tsdiff(struct timespec* x, struct timespec* y, struct timespec* re
         a = y;
         b = x;
     }
-    result->tv_sec = x->tv_sec + x->tv_nsec / NSEC - y->tv_sec - y->tv_nsec / NSEC;
-    result->tv_nsec = x->tv_nsec % NSEC - y->tv_nsec % NSEC;
+    result->tv_sec = a->tv_sec + a->tv_nsec / NSEC - b->tv_sec - b->tv_nsec / NSEC;
+    result->tv_nsec = a->tv_nsec % NSEC - b->tv_nsec % NSEC;
     if (result->tv_nsec < 0) {
         result->tv_sec -= 1;
         result->tv_nsec *= -1;
