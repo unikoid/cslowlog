@@ -19,6 +19,7 @@
 struct cslowlog_t {
     struct timespec start;
     struct timespec threshold;
+    clockid_t clk_id;
 };
 
 /* timespec-related functions */
@@ -63,10 +64,11 @@ int cslowlog_tscmp(struct timespec* x, struct timespec* y) {
  * @param nanoseconds after which timer should expire (should be less then 1 billion)
  * @return 0 if successful, otherwise -1
  */
-int cslowlog_start(struct cslowlog_t* timer, time_t sec, long nsec) {
+int cslowlog_start(struct cslowlog_t* timer, clockid_t clk_id, time_t sec, long nsec) {
     timer->threshold.tv_sec = sec;
     timer->threshold.tv_nsec = nsec;
-    return clock_gettime(CLOCK_REALTIME, &timer->start);
+    timer->clk_id = clk_id;
+    return clock_gettime(timer->clk_id, &timer->start);
 }
 
 /**
@@ -77,7 +79,7 @@ int cslowlog_start(struct cslowlog_t* timer, time_t sec, long nsec) {
  */
 int cslowlog_get_elapsed(struct cslowlog_t* timer, struct timespec* elapsed) {
     struct timespec current;
-    if (clock_gettime(CLOCK_REALTIME, &current) < 0) {
+    if (clock_gettime(timer->clk_id, &current) < 0) {
         return -1;
     }
     cslowlog_tsdiff(&current, &timer->start, elapsed);
