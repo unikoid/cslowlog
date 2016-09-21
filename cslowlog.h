@@ -163,6 +163,7 @@ int cslowlog_printf(struct cslowlog_t* timer, const char* format, ...) {
 namespace cslowlog {
     class Timer {
     protected:
+        static std::ostream dummy;
         struct cslowlog_t timer;
     public:
         Timer(time_t sec, long nsec);
@@ -170,14 +171,16 @@ namespace cslowlog {
         struct timespec get_elapsed();
         template<typename T>
         T run(std::function <T (struct timespec*)>);
-        template<typename T>
-        Timer& operator<<(T&);
+        template<std::ostream&>
+        std::ostream& getOStream();
     };
-    
+
+    std::ostream Timer::dummy{nullptr};
+
     Timer::Timer(time_t sec, long nsec) {
         cslowlog_start(&timer, sec, nsec);
     }
-    
+
     bool Timer::expired() {
         return cslowlog_expired(&timer) > 0;
     }
@@ -195,12 +198,12 @@ namespace cslowlog {
         return f(&elapsed);
     }
     
-    template<typename T>
-    Timer& Timer::operator<<(T& obj) {
+    template<std::ostream& s>
+    std::ostream& Timer::getOStream() {
         if (expired()) {
-            std::cout << obj;
+            return s;
         }
-        return *this;
+        return dummy;
     }
 }
 

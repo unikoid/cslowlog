@@ -11,5 +11,6 @@ int main(int argc, char** argv) {
         return;
     });
     */
-    t << "Done" << "Success" << "Wow";
+    t.getOStream<std::cout>() << "Done" << "Success" << "Wow" << std::endl;
+    std::cout << "Fin" << std::endl;
 }
